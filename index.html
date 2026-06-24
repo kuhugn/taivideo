@@ -15,7 +15,7 @@
   <!-- Babel CDN (để biên dịch JSX ngay trên trình duyệt) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Cấu hình Babel: Ép sử dụng Classic JSX Runtime thay vì Automatic để tránh lỗi import "react/jsx-runtime" -->
+  <!-- Cấu hình Babel: Ép sử dụng Classic JSX Runtime để tránh lỗi import "react/jsx-runtime" -->
   <script>
     Babel.registerPreset('react-classic', {
       presets: [
@@ -141,33 +141,30 @@
 
       const handleDownload = async (originalUrl, directUrl) => {
         setIsDownloading(true);
-        try {
-          // Sử dụng Cobalt API - Dịch vụ chuyên dụng để bypass lỗi 403 của X
-          const response = await fetch('https://api.cobalt.tools/api/json', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              url: originalUrl
-            })
-          });
-          
-          const result = await response.json();
-          
-          if (result && result.url) {
-            // Cobalt trả về link tải trực tiếp (đã bypass, file tải thẳng về máy)
-            window.location.href = result.url;
-          } else {
-             throw new Error('Máy chủ từ chối tạo link.');
+        
+        // Tạo một chút độ trễ để UI hiển thị mượt mà trước khi mở link
+        setTimeout(() => {
+          try {
+            // TẠO THẺ A ẨN ĐỂ BYPASS LỖI 403 (Forbidden)
+            const link = document.createElement('a');
+            link.href = directUrl;
+            link.target = '_blank'; // Mở sang tab mới
+            
+            // THUỘC TÍNH QUAN TRỌNG NHẤT: 'noreferrer' giúp giấu đi nguồn gốc (Vercel)
+            // Nhờ đó Twitter CDN sẽ coi đây là truy cập trực tiếp bằng tay và cho phép xem/tải file.
+            link.rel = 'noopener noreferrer'; 
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+          } catch (error) {
+            console.error(error);
+            alert('Có lỗi xảy ra khi mở link tải.');
+          } finally {
+            setIsDownloading(false);
           }
-        } catch (error) {
-          console.error(error);
-          alert('Có lỗi xảy ra khi tạo link tải. Vui lòng thử lại sau.');
-        } finally {
-          setIsDownloading(false);
-        }
+        }, 500);
       };
 
       return (
@@ -278,6 +275,7 @@
                             <span className="font-bold text-slate-200">{item.quality}</span>
                             <span className="text-xs text-slate-400">{item.format.toUpperCase()} • {item.size}</span>
                           </div>
+                          
                           <button 
                             onClick={() => handleDownload(videoData.originalUrl, item.url)}
                             disabled={isDownloading}
@@ -292,8 +290,9 @@
                             ) : (
                               <DownloadIcon className="w-4 h-4 mr-2" />
                             )}
-                            {isDownloading ? 'Đang tạo...' : `Tải ${item.format}`}
+                            {isDownloading ? 'Đang mở...' : `Tải ${item.format}`}
                           </button>
+
                         </div>
                       ))}
                     </div>
@@ -324,7 +323,7 @@
               <div className="flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center mb-3 text-slate-400 font-bold">3</div>
                 <h3 className="font-semibold text-slate-200 mb-2">Tải video về</h3>
-                <p className="text-sm text-slate-400">Chọn chất lượng mong muốn và lưu video trực tiếp về thiết bị.</p>
+                <p className="text-sm text-slate-400">Lưu video trực tiếp về thiết bị từ tab trình duyệt mới.</p>
               </div>
             </div>
           )}
