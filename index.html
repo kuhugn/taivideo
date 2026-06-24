@@ -98,28 +98,50 @@
         setError('');
         setVideoData(null);
 
-        // Giả lập API
-        setTimeout(() => {
-          const mockApiResponse = {
-            success: true,
-            author: 'Người Dùng X',
-            description: 'Đây là video demo được tải về từ nền tảng X. #demo #video',
-            thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop',
-            duration: '0:45',
-            downloads: [
-              { quality: 'HD (720p)', size: '4.5 MB', format: 'mp4', url: '#' },
-              { quality: 'SD (480p)', size: '2.1 MB', format: 'mp4', url: '#' },
-              { quality: 'Audio', size: '0.8 MB', format: 'mp3', url: '#' }
-            ]
-          };
+        try {
+          // Trích xuất username và ID bài viết từ URL
+          const match = url.match(/(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/(?:#!\/)?(\w+)\/status(es)?\/(\d+)/);
+          const username = match[1];
+          const videoId = match[3];
+          
+          // Sử dụng API công khai miễn phí (vxtwitter) làm backend trung gian
+          const apiUrl = `https://api.vxtwitter.com/${username}/status/${videoId}`;
+          const response = await fetch(apiUrl);
+          
+          if (!response.ok) {
+            throw new Error('Không thể lấy thông tin. Bài viết có thể bị ẩn, đã xóa, hoặc không tồn tại.');
+          }
+          
+          const data = await response.json();
+          
+          // Kiểm tra xem bài viết có chứa video hay không
+          const videoMedia = data.media_extended && data.media_extended.find(m => m.type === 'video');
+          if (!videoMedia) {
+            throw new Error('Không tìm thấy video nào trong bài viết này.');
+          }
 
-          setVideoData(mockApiResponse);
+          setVideoData({
+            success: true,
+            author: data.user_name || username,
+            description: data.text || 'Không có mô tả',
+            thumbnail: videoMedia.thumbnail_url,
+            duration: 'Video',
+            downloads: [
+              { quality: 'Bản Gốc', size: 'Tự động', format: 'mp4', url: videoMedia.url }
+            ]
+          });
+        } catch (err) {
+          setError(err.message || 'Có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại.');
+        } finally {
           setLoading(false);
-        }, 2000);
+        }
       };
 
       const handleDownload = (downloadUrl, quality) => {
-        alert(`Bắt đầu tải xuống chất lượng: ${quality}. (Chức năng này cần backend để tạo file tải thực tế)`);
+        // Mở link video gốc trên tab mới. 
+        // Trình duyệt không cho phép ép tải trực tiếp file từ tên miền khác (CORS), 
+        // nên việc mở tab mới để người dùng "Lưu video" là giải pháp tối ưu nhất cho frontend thuần.
+        window.open(downloadUrl, '_blank');
       };
 
       return (
